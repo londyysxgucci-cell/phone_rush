@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment: { POSTGRES_USER: phonerush, POSTGRES_PASSWORD: phonerush, POSTGRES_DB: phonerush }
+    volumes: [pgdata:/var/lib/postgresql/data]
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://phonerush:phonerush@db:5432/phonerush
+      NODE_ENV: production
+    depends_on: [db]
+    ports: ["3000:3000"]
+volumes:
+  pgdata:
