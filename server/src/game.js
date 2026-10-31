@@ -32,6 +32,7 @@ export function publicState(u, cfg, rewards, now = new Date()) {
     coins: u.coins, spins: st.spins, spins_max: cfg.max, next_refill_at: st.next, coin_cost: cfg.coin_cost,
     level: u.level, xp: u.xp, xp_from: 100 * (u.level - 1) ** 2, xp_to: 100 * u.level ** 2,
     spin_count: u.spin_count, numbers_count: u.numbers_count, rare_count: u.rare_count, legendary_count: u.legendary_count,
+    tutorial_done: !!u.tutorial_done,
     created_at: u.created_at, daily: { can_claim: can, streak, done: can ? streak % len : streak % len || len, rewards },
   };
 }

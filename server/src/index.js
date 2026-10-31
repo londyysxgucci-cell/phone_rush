@@ -117,6 +117,12 @@ app.post('/api/daily-task/claim', ah(async (req, res) => {
   res.json(await claimDailyTask(req.user.id));
 }));
 
+// Обучение
+app.post('/api/tutorial/done', ah(async (req, res) => {
+  await q('UPDATE users SET tutorial_done=true WHERE id=$1', [req.user.id]);
+  res.json({ ok: true });
+}));
+
 if (pub) { app.use(express.static(pub, { maxAge: '1h' })); app.get('*', (req, res) => res.sendFile(path.join(pub, 'index.html'))); }
 app.use((e, req, res, next) => {
   if (e instanceof HttpError) return res.status(e.status).json({ error: e.message });

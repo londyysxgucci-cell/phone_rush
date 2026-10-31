@@ -6,7 +6,7 @@ export type Num = { id: number; number: string; digits: string; rarity: Rarity; 
 export type State = {
   id: number; first_name: string; username: string | null; photo_url: string | null; coins: number; spins: number; spins_max: number;
   next_refill_at: string | null; coin_cost: number; level: number; xp: number; xp_from: number; xp_to: number;
-  spin_count: number; numbers_count: number; rare_count: number; legendary_count: number; created_at: string;
+  spin_count: number; numbers_count: number; rare_count: number; legendary_count: number; tutorial_done: boolean; created_at: string;
   garage_slots?: number; stars?: number;
   daily: { can_claim: boolean; streak: number; done: number; rewards: { coins: number; spins: number }[] };
 };
@@ -64,5 +64,6 @@ export const api = {
   // Ежедневное задание
   dailyTask: () => call<DailyTask>('/daily-task'),
   dailyTaskClaim: () => call<{ reward: { coins: number; spins: number; stars: number }; user: any }>('/daily-task/claim', 'POST'),
+  tutorialDone: () => call<{ ok: boolean }>('/tutorial/done', 'POST'),
 };
 export const haptic = (s: 'light' | 'medium' | 'heavy' = 'light') => tg?.HapticFeedback?.impactOccurred(s);

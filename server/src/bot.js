@@ -1,3 +1,6 @@
+import { q } from './db.js';
+import { isAdmin } from './auth.js';
+
 const T = process.env.BOT_TOKEN;
 let name = '';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -7,32 +10,63 @@ export const botName = () => name;
 async function onMessage(m) {
   console.log('Получено сообщение:', m.text);
 
-  if (m.chat?.type !== 'private' || !m.text || !/^\/(start|help|play)/.test(m.text)) return;
+  if (m.chat?.type !== 'private' || !m.text) return;
 
-  const result = await tg('sendMessage', {
-    chat_id: m.chat.id,
-    text: '📱 PHONE RUSH\n\nКрути и собирай редкие вымышленные номера!',
-    reply_markup: {
-      inline_keyboard: [[
-        {
-          text: '🎮 Играть',
-          web_app: { url: process.env.WEBAPP_URL }
-        }
-      ]]
+  const isAdminUser = isAdmin(m.from.id);
+
+  // Рассылка всем игрокам (только админ)
+  if (/^\/broadcast(\s+|$)/i.test(m.text) && isAdminUser) {
+    const text = m.text.replace(/^\/broadcast/i, '').trim();
+    if (!text) {
+      await tg('sendMessage', { chat_id: m.chat.id, text: 'Использование: /broadcast ваш текст' });
+      return;
     }
-  });
 
-  if (!result.ok) {
-    console.error('Ошибка отправки сообщения:', result.description);
-  } else {
-    console.log('Ответ успешно отправлен!');
+    const users = (await q('SELECT id FROM users WHERE NOT is_banned')).rows;
+    let sent = 0, failed = 0;
+    for (const { id } of users) {
+      try {
+        await tg('sendMessage', { chat_id: id, text });
+        sent++;
+      } catch (e) {
+        failed++;
+      }
+      // Пауза между сообщениями, чтобы не получить лимит от Telegram
+      await sleep(40);
+    }
+    await tg('sendMessage', { chat_id: m.chat.id, text: `Рассылка завершена: отправлено ${sent}, ошибок ${failed}` });
+    return;
+  }
+
+  if (/^\/(start|help|play)/i.test(m.text)) {
+    const result = await tg('sendMessage', {
+      chat_id: m.chat.id,
+      text: '📱 PHONE RUSH\n\nКрути и собирай редкие вымышленные номера!\n\nАдмин может сделать рассылку всем: /broadcast текст',
+      reply_markup: {
+        inline_keyboard: [[
+          {
+            text: '🎮 Играть',
+            web_app: { url: process.env.WEBAPP_URL }
+          }
+        ]]
+      }
+    });
+
+    if (!result.ok) {
+      console.error('Ошибка отправки сообщения:', result.description);
+    } else {
+      console.log('Ответ успешно отправлен!');
+    }
   }
 }
 export async function startBot() {
   const me = await tg('getMe');
   if (!me.ok) throw new Error('Неверный BOT_TOKEN');
   name = me.result.username;
-  await tg('setMyCommands', { commands: [{ command: 'start', description: 'Открыть игру' }] });
+  await tg('setMyCommands', { commands: [
+    { command: 'start', description: 'Открыть игру' },
+    { command: 'broadcast', description: 'Рассылка всем (только админ)' },
+  ] });
   await tg('setChatMenuButton', { menu_button: { type: 'web_app', text: 'Играть', web_app: { url: process.env.WEBAPP_URL } } });
   await tg('deleteWebhook');
   let offset = 0;

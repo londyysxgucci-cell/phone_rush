@@ -139,11 +139,20 @@ function NumCard({ n, onClick }: { n: Num; onClick: () => void }) {
   );
 }
 
-function CollectionTab({ open, tick }: { open: (id: number) => void; tick: number }) {
+function CollectionTab({ open, tick, toast }: { open: (id: number) => void; tick: number; toast: (s: string) => void }) {
   const [sort, setSort] = useState('rarity');
   const [rar, setRar] = useState('');
   const [d, setD] = useState<Collection | null>(null);
+  const reload = () => api.collection(sort, rar).then(setD).catch(() => {});
   useEffect(() => { api.collection(sort, rar).then(setD).catch(() => {}); }, [sort, rar, tick]);
+
+  const sell = async (id: number) => {
+    try {
+      await api.marketList(id, 50, 0);
+      toast('Выставлено на рынок за 50 🪙');
+      reload();
+    } catch (e: any) { toast(e.message); }
+  };
   const total = d ? Object.values(d.counts).reduce((a, b) => a + (b || 0), 0) : 0;
   const goals = [10, 25, 50, 100, 250, 500, 1000], goal = goals.find((g) => g > total) ?? total;
   return (
@@ -168,7 +177,12 @@ function CollectionTab({ open, tick }: { open: (id: number) => void; tick: numbe
           {['', ...RARITIES].map((r) => <button key={r} onClick={() => setRar(r)} className={`shrink-0 rounded-full px-3 py-1 text-xs ${rar === r ? 'bg-blue-600' : 'glass'}`}>{r ? R[r as Rarity].label : 'Все'}</button>)}
         </div>
         {d.items.length === 0 ? <div className="mt-8 text-center text-white/50">Здесь пока пусто. Вернитесь на главный экран и нажмите «КРУТИТЬ».</div>
-          : <div className="mt-3 grid grid-cols-2 gap-2">{d.items.map((n) => <NumCard key={n.id} n={n} onClick={() => open(n.id)} />)}</div>}
+          : <div className="mt-3 grid grid-cols-2 gap-2">{d.items.map((n) => (
+            <div key={n.id} className="flex flex-col gap-1">
+              <NumCard n={n} onClick={() => open(n.id)} />
+              <button onClick={() => sell(n.id)} className="glass rounded-xl py-1 text-xs text-violet-300">Продать за 50 🪙</button>
+            </div>
+          ))}</div>}
       </>}
     </div>
   );
@@ -339,20 +353,6 @@ function MarketTab({ me, load, loading, listings, my, refresh, toast }: { me: Me
   );
 }
 
-function GarageTab({ me }: { me: Me }) {
-  return (
-    <div className="px-4 pb-4">
-      <h2 className="mt-3 text-xl font-black">Гараж (сейф)</h2>
-      <div className="glass mt-3 rounded-2xl p-4 text-center">
-        <div className="text-3xl font-black">🅿️</div>
-        <div className="mt-2 text-white/80">Мест в гараже: {me.garage_slots ?? 5}</div>
-        <div className="mt-1 text-sm text-white/50">Здесь хранятся ваши самые ценные номера. Они под защитой: игра их не продаст и не заберёт.</div>
-        <button className="btn-spin mt-4 w-full rounded-xl py-3 font-bold disabled:opacity-50" disabled>Переместить номер в гараж (скоро)</button>
-      </div>
-    </div>
-  );
-}
-
 function FriendsTab({ me, list, invites, load, query, setQuery, results, setSearchResults, toast }: { me: Me; list: Friend[]; invites: Invite[]; load: () => void; query: string; setQuery: (s: string) => void; results: SearchUser[]; setSearchResults: (r: SearchUser[]) => void; toast: (s: string) => void }) {
   useEffect(() => { load(); }, [load]);
   const [inviting, setInviting] = useState<number | null>(null);
@@ -473,6 +473,49 @@ function SettingsTab({ me }: { me: Me }) {
   );
 }
 
+function Tutorial({ onFinish }: { onFinish: () => void }) {
+  const [step, setStep] = useState(0);
+  const steps: { title: string; text: string }[] = [
+    {
+      title: 'Добро пожаловать в PHONE RUSH',
+      text: 'Крути барабан и собирай редкие вымышленные номера с кодом +999. Это игра без реальных денег и звонков.',
+    },
+    {
+      title: 'Редкости и награды',
+      text: 'От обычных до секретных номеров. Чем редче выпало — тем больше монет и опыта.',
+    },
+    {
+      title: 'Коллекция и рынок',
+      text: 'Любой номер из коллекции можно выставить на рынок за 50 монет и продать другому игроку.',
+    },
+  ];
+
+  return (
+    <div className="aurora flex h-full flex-col items-center justify-center p-6 text-center">
+      <div className="glass rounded-3xl p-8 max-w-sm w-full border border-white/10">
+        <div className="text-4xl font-black mb-4">{steps[step].title}</div>
+        <div className="text-white/80 text-lg mb-8">{steps[step].text}</div>
+        <div className="flex gap-2 justify-center">
+          {steps.map((_, i) => (
+            <div key={i} className={`w-2 h-2 rounded-full transition ${i === step ? 'bg-violet-500' : 'bg-white/20'}`} />
+          ))}
+        </div>
+        <div className="mt-8">
+          {step < steps.length - 1 ? (
+            <button onClick={() => setStep((s) => s + 1)} className="btn-spin w-full rounded-xl py-3 font-bold">
+              Далее
+            </button>
+          ) : (
+            <button onClick={onFinish} className="btn-spin w-full rounded-xl py-3 font-bold">
+              Завершить обучение
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [err, setErr] = useState('');
@@ -531,11 +574,16 @@ export default function App() {
   if (err) return <div className="aurora grid h-full place-items-center p-8 text-center"><div><div className="text-xl font-black">Не удалось войти</div><p className="mt-2 text-white/60">{err}</p></div></div>;
   if (!me) return <div className="aurora grid h-full place-items-center text-white/50">Загрузка…</div>;
 
+  if (!me.tutorial_done) {
+    return <Tutorial onFinish={() => {
+      api.tutorialDone().then(() => setMe((m) => (m ? { ...m, tutorial_done: true } : m)));
+    }} />;
+  }
+
   const tabs: [Tab, string, string][] = [
     ['play', '🎰', 'Играть'],
     ['collection', '🗂', 'Коллекция'],
     ['market', '🏪', 'Рынок'],
-    ['garage', '🅿️', 'Гараж'],
     ['board', '🏆', 'Рейтинг'],
     ['friends', '👥', 'Друзья'],
     ['profile', '👤', 'Профиль'],
@@ -545,9 +593,8 @@ export default function App() {
     <div className="aurora flex h-full flex-col">
       <div className="flex-1 overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         {tab === 'play' && <Home me={me} setMe={(f) => setMe((m) => (m ? f(m) : m))} toast={toast} open={setDetail} refresh={refresh} />}
-        {tab === 'collection' && <CollectionTab open={setDetail} tick={tick} />}
+        {tab === 'collection' && <CollectionTab open={setDetail} tick={tick} toast={toast} />}
         {tab === 'market' && <MarketTab me={me} load={loadMarket} loading={marketLoading} listings={marketListings} my={myListings} refresh={refresh} toast={toast} />}
-        {tab === 'garage' && <GarageTab me={me} />}
         {tab === 'board' && <BoardTab />}
         {tab === 'friends' && <FriendsTab me={me} list={friendsList} invites={friendInvites} load={loadFriends} query={searchQuery} setQuery={setSearchQuery} results={searchUsers} setSearchResults={setSearchUsers} toast={toast} />}
         {tab === 'profile' && <ProfileTab me={me} />}
