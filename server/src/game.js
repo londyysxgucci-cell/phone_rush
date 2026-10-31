@@ -1,9 +1,9 @@
-import { q, tx } from './db.js';
+import { q, tx, dayKey } from './db.js';
 import { RARITIES, REWARDS, generate, pickRarity } from './rarity.js';
+import { incrementTask } from './tasks.js';
 
 export class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
 
-export const dayKey = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: process.env.GAME_TZ || 'Europe/Moscow' });
 const DEFAULTS = {
   rarity_weights: { common: 55, uncommon: 25, rare: 12, epic: 5, legendary: 2, mythic: 0.8, secret: 0.2 },
   spin_config: { max: 10, interval_min: 20, coin_cost: 50, cooldown_ms: 1000 },
@@ -72,6 +72,11 @@ export async function spin(userId) {
          numbers_count=numbers_count+$7, rare_count=rare_count+$8, legendary_count=legendary_count+$9, last_spin_at=$10 WHERE id=$1`,
       [userId, coins + coinsReward + bonus, spins, st.at, xp, level, isNew ? 1 : 0, isNew && idx >= 2 ? 1 : 0, isNew && idx >= 4 ? 1 : 0, now]);
     await c.query('INSERT INTO spins_log (user_id, number, rarity, is_new, coins_reward) VALUES ($1,$2,$3,$4,$5)', [userId, g.number, g.rarity, isNew, coinsReward]);
+
+    // Прогресс ежедневного задания
+    await incrementTask(userId, 'spins', 1).catch(() => {});
+    if (isNew && idx >= 2) await incrementTask(userId, 'collect_rare', 1).catch(() => {});
+
     return { number: fmt(row), is_new: isNew, coins_reward: coinsReward, xp_gain: xpGain, level_up: level > u.level ? { to: level, bonus } : null, state: await stateOf(c, userId) };
   });
 }

@@ -10,6 +10,9 @@ import { authenticate, isAdmin } from './auth.js';
 import { HttpError, fmt, getUserState, getSetting, spin, claimDaily } from './game.js';
 import { RARITIES, SECRET_TOTAL } from './rarity.js';
 import { startBot, botName } from './bot.js';
+import { listMarket, myListings, createListing, buyListing, cancelListing } from './market.js';
+import { friendsList, pendingInvites, sendInvite, respondInvite, removeFriend, searchUsers } from './social.js';
+import { getDailyTask, claimDailyTask, incrementTask } from './tasks.js';
 
 for (const k of ['BOT_TOKEN', 'DATABASE_URL', 'WEBAPP_URL']) if (!process.env[k]) { console.error(`Не задана переменная ${k}`); process.exit(1); }
 
@@ -65,6 +68,53 @@ app.get('/api/leaderboard', ah(async (req, res) => {
   const top = await q(`SELECT id, first_name, photo_url, level, ${col} AS value FROM users WHERE NOT is_banned ORDER BY ${col} DESC, xp DESC, id LIMIT 50`);
   const mine = (await q(`SELECT count(*)::int + 1 AS rank FROM users WHERE NOT is_banned AND ${col} > $1`, [req.user[col]])).rows[0].rank;
   res.json({ top: top.rows, me: { rank: mine, value: req.user[col] } });
+}));
+
+// --- Рынок номеров ---
+app.get('/api/market', ah(async (req, res) => {
+  res.json(await listMarket(req.user.id));
+}));
+app.get('/api/market/my', ah(async (req, res) => {
+  res.json(await myListings(req.user.id));
+}));
+app.post('/api/market/list', ah(async (req, res) => {
+  const { phone_number_id, price_coins, price_stars } = req.body || {};
+  res.json(await createListing(req.user.id, { phoneNumberId: phone_number_id, priceCoins: price_coins, priceStars: price_stars }));
+}));
+app.post('/api/market/buy/:id', ah(async (req, res) => {
+  res.json(await buyListing(req.user.id, Number(req.params.id)));
+}));
+app.post('/api/market/cancel/:id', ah(async (req, res) => {
+  res.json(await cancelListing(req.user.id, Number(req.params.id)));
+}));
+
+// --- Друзья ---
+app.get('/api/friends', ah(async (req, res) => {
+  res.json(await friendsList(req.user.id));
+}));
+app.get('/api/friends/invites', ah(async (req, res) => {
+  res.json(await pendingInvites(req.user.id));
+}));
+app.post('/api/friends/invite', ah(async (req, res) => {
+  res.json(await sendInvite(req.user.id, req.body || {}));
+}));
+app.post('/api/friends/respond/:id', ah(async (req, res) => {
+  const { accept } = req.body || {};
+  res.json(await respondInvite(req.user.id, { inviteId: Number(req.params.id), accept: accept === true }));
+}));
+app.post('/api/friends/remove/:id', ah(async (req, res) => {
+  res.json(await removeFriend(req.user.id, Number(req.params.id)));
+}));
+app.get('/api/users/search', ah(async (req, res) => {
+  res.json(await searchUsers(req.query.q || '', req.user.id));
+}));
+
+// --- Ежедневное задание ---
+app.get('/api/daily-task', ah(async (req, res) => {
+  res.json(await getDailyTask(req.user.id));
+}));
+app.post('/api/daily-task/claim', ah(async (req, res) => {
+  res.json(await claimDailyTask(req.user.id));
 }));
 
 if (pub) { app.use(express.static(pub, { maxAge: '1h' })); app.get('*', (req, res) => res.sendFile(path.join(pub, 'index.html'))); }

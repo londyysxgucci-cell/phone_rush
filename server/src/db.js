@@ -9,6 +9,8 @@ pg.types.setTypeParser(1082, (v) => v);   // date -> 'YYYY-MM-DD'
 export const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
 export const q = (text, params) => pool.query(text, params);
 
+export const dayKey = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: process.env.GAME_TZ || 'Europe/Moscow' });
+
 export async function tx(fn) {
   const c = await pool.connect();
   try {
